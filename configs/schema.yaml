@@ -1,0 +1,71 @@
+# AuditHub - Schema Definitions
+# =============================================================================
+# This file defines expected schemas for datasets flowing through AuditHub.
+# Schemas are used by Great Expectations and custom validators.
+# Fields with 'auto' mean the schema is inferred at runtime.
+
+dataset:
+  expected_columns:
+    - name: "id"
+      type: "auto"
+      nullable: false
+      unique: true
+    - name: "feature_1"
+      type: "auto"
+      nullable: true
+      unique: false
+    - name: "feature_2"
+      type: "auto"
+      nullable: true
+      unique: false
+    - name: "target"
+      type: "auto"
+      nullable: false
+      unique: false
+
+  constraints:
+    min_rows: 10
+    max_rows: 10000000
+    max_missing_fraction: 0.5
+    max_duplicate_fraction: 0.0
+    allowed_file_types:
+      - ".csv"
+      - ".tsv"
+      - ".json"
+      - ".parquet"
+      - ".xlsx"
+      - ".xls"
+
+  column_types:
+    integer: ["int64", "int32", "int16", "int8", "uint64", "uint32", "uint16", "uint8"]
+    float: ["float64", "float32", "float16"]
+    categorical: ["object", "category", "bool"]
+    datetime: ["datetime64[ns]", "datetime64[ns, UTC]"]
+    text: ["string"]
+
+profiling_schema:
+  report_sections:
+    - "overview"
+    - "variables"
+    - "correlations"
+    - "missing_values"
+    - "sample"
+    - "warnings"
+
+health_schema:
+  grade_ranges:
+    A:
+      min: 90
+      max: 100
+    B:
+      min: 75
+      max: 89
+    C:
+      min: 60
+      max: 74
+    D:
+      min: 40
+      max: 59
+    F:
+      min: 0
+      max: 39

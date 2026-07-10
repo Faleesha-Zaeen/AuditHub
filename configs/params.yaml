@@ -1,0 +1,86 @@
+# AuditHub - Parameters
+# =============================================================================
+# This file defines tunable parameters for data processing, validation,
+# model training, and evaluation. These values can be overridden at runtime.
+
+data:
+  ingestion:
+    chunk_size: 10000
+    encoding: "utf-8"
+    max_file_size_mb: 500
+    supported_formats:
+      - "csv"
+      - "tsv"
+      - "json"
+      - "parquet"
+      - "excel"
+    missing_threshold: 0.5  # Max fraction of missing values before flagging
+
+  validation:
+    dataset_min_rows: 10
+    dataset_max_rows: 10_000_000
+    dataset_min_columns: 1
+    dataset_max_columns: 1000
+    duplicate_threshold: 0.0  # Tolerance for duplicate rows (0 = no tolerance)
+
+  profiling:
+    max_categories: 50  # Max categories to display for categorical features
+    correlation_threshold: 0.8  # Threshold for flagging high correlations
+    sample_size: 100000  # Max rows to use for profiling large datasets
+
+  quality:
+    health_score_weights:
+      completeness: 0.25
+      uniqueness: 0.15
+      consistency: 0.20
+      accuracy: 0.25
+      timeliness: 0.15
+
+  repair:
+    max_iterations: 10
+    imputation_strategy: "mean"  # Options: mean, median, mode, knn, none
+    outlier_method: "iqr"  # Options: iqr, zscore, isolation_forest
+    outlier_threshold: 3.0  # Z-score threshold for outlier detection
+
+  mutation:
+    noise_level: 0.05
+    corruption_fraction: 0.1
+    missing_fraction: 0.1
+    max_mutations: 1000
+
+  robustness:
+    test_split_ratio: 0.2
+    validation_split_ratio: 0.1
+    random_seed: 42
+    perturbation_levels:
+      - 0.01
+      - 0.05
+      - 0.10
+      - 0.25
+
+training:
+  model_type: "auto"  # Options: auto, linear, tree, ensemble, deep
+  test_size: 0.2
+  validation_size: 0.1
+  random_state: 42
+  cross_validation_folds: 5
+  hyperparameter_tuning: false
+  tuning_trials: 50
+  early_stopping_rounds: 10
+
+evaluation:
+  metrics:
+    classification:
+      - "accuracy"
+      - "precision"
+      - "recall"
+      - "f1_score"
+      - "roc_auc"
+      - "confusion_matrix"
+    regression:
+      - "mse"
+      - "rmse"
+      - "mae"
+      - "r2_score"
+      - "mape"
+  report_format: "html"  # Options: html, pdf, json

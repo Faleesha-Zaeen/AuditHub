@@ -1,0 +1,72 @@
+# =============================================================================
+# AuditHub - Docker Compose
+# =============================================================================
+# Orchestrates the AuditHub services for local development and deployment.
+
+version: "3.9"
+
+services:
+  audithub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: audithub
+    image: audithub:latest
+    restart: unless-stopped
+    ports:
+      - "8501:8501"   # Streamlit dashboard
+      - "8000:8000"   # FastAPI backend
+    volumes:
+      # Persistent storage
+      - audithub_data:/app/data
+      - audithub_artifacts:/app/artifacts
+      - audithub_models:/app/models
+      - audithub_reports:/app/reports
+      - audithub_logs:/app/logs
+      - audithub_mlruns:/app/mlruns
+      # Mount configs for live development
+      - ./configs:/app/configs
+      - ./src:/app/src
+    environment:
+      # Application configuration
+      - AUDITHUB_ENVIRONMENT=development
+      - AUDITHUB_DEBUG=true
+      - AUDITHUB_CONFIG_PATH=/app/configs/config.yaml
+      - AUDITHUB_LOGGING_CONFIG=/app/configs/logging.yaml
+      - AUDITHUB_DB_PATH=/app/data/audithub.db
+      # MLflow configuration
+      - MLFLOW_TRACKING_URI=/app/mlruns
+      # Streamlit configuration
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_HEADLESS=true
+    command: >
+      streamlit run app/main.py
+      --server.address=0.0.0.0
+      --server.port=8501
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - audithub_network
+
+volumes:
+  audithub_data:
+    driver: local
+  audithub_artifacts:
+    driver: local
+  audithub_models:
+    driver: local
+  audithub_reports:
+    driver: local
+  audithub_logs:
+    driver: local
+  audithub_mlruns:
+    driver: local
+
+networks:
+  audithub_network:
+    driver: bridge

@@ -1,0 +1,125 @@
+# AuditHub - Logging Configuration
+# =============================================================================
+# This file defines the logging configuration for AuditHub.
+# Supports console and file-based logging with rotation.
+
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  standard:
+    format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+  detailed:
+    format: "%(asctime)s | %(name)s | %(levelname)s | %(filename)s:%(lineno)d | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+  json:
+    format: '{"timestamp": "%(asctime)s", "logger": "%(name)s", "level": "%(levelname)s", "file": "%(filename)s", "line": %(lineno)d, "message": "%(message)s"}'
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: standard
+    stream: ext://sys.stdout
+
+  file:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/audithub.log
+    when: midnight
+    interval: 1
+    backupCount: 30
+    encoding: utf-8
+
+  error_file:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: ERROR
+    formatter: detailed
+    filename: logs/audithub_error.log
+    when: midnight
+    interval: 1
+    backupCount: 90
+    encoding: utf-8
+
+loggers:
+  audithub:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.utils:
+    level: DEBUG
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.ingestion:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.validation:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.profiling:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.quality:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.repair:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.health:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.mutation:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.robustness:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.training:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.evaluation:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.reporting:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.database:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+  audithub.pipeline:
+    level: INFO
+    handlers: [console, file, error_file]
+    propagate: false
+
+root:
+  level: WARNING
+  handlers: [console, file]

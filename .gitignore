@@ -1,0 +1,99 @@
+# AuditHub - .gitignore
+# =============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+
+# Virtual Environment
+venv/
+.venv/
+env/
+.env/
+virtualenv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# MLflow
+mlruns/
+mlflow.db
+mlartifacts/
+
+# DVC
+.dvc/
+.dvc/cache/
+.dvc/tmp/
+
+# Data files
+data/raw/
+data/processed/
+data/validated/
+data/repaired/
+data/mutated/
+data/reports/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Artifacts
+artifacts/
+models/
+
+# Reports
+reports/
+
+# Config
+.env
+*.env.local
+
+# Docker
+.docker/
+
+# Testing
+.pytest_cache/
+test-results/
+.coverage
+htmlcov/
+coverage/
+*.coverage.*
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS Generated
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp
+tmp/
+temp/
+*.tmp

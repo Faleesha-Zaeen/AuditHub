@@ -1,0 +1,56 @@
+# AuditHub - Main Configuration
+# =============================================================================
+# This file contains the primary application configuration for AuditHub.
+# Modify values here to control application behavior at runtime.
+
+app:
+  name: "AuditHub"
+  version: "0.1.0"
+  environment: "development"  # Options: development, staging, production
+  debug: true
+
+server:
+  host: "0.0.0.0"
+  port: 8501  # Streamlit default port
+  api_port: 8000  # FastAPI backend port
+  reload: true
+
+database:
+  engine: "sqlite"
+  path: "data/audithub.db"
+  echo_sql: false
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+  file: "logs/audithub.log"
+  rotation: "midnight"
+  retention: "30 days"
+
+mlflow:
+  tracking_uri: "mlruns"
+  experiment_name: "audithub_default"
+  artifact_location: "artifacts/mlflow"
+
+dvc:
+  remote: "local"
+  cache_dir: "data/dvc_cache"
+
+streamlit:
+  page_title: "AuditHub - Dataset Quality & MLOps Platform"
+  page_icon: "📊"
+  layout: "wide"
+  initial_sidebar_state: "expanded"
+
+great_expectations:
+  data_context_path: "configs/great_expectations"
+  expectation_suite_name: "default_suite"
+
+evidently:
+  report_path: "reports/evidently"
+
+profiling:
+  minimal_mode: false
+  explorative: true
+  sensitive: false
+  pool_size: 0
