@@ -16,7 +16,8 @@ from typing import Dict, FrozenSet, List, Tuple
 # Project Root
 # ============================================================================
 
-PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent.parent
+# constants.py -> utils/ -> src/ -> project root.
+PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 
 # ============================================================================
 # Directory Paths
@@ -160,7 +161,11 @@ DEFAULT_CHUNK_SIZE: int = 10_000
 # ============================================================================
 
 DEFAULT_MLFLOW_EXPERIMENT: str = "audithub_default"
-DEFAULT_MLFLOW_TRACKING_URI: str = str(MLRUNS_DIR)
+# MLflow 3.x put the bare-filesystem tracking backend into maintenance mode,
+# so "./mlruns" is rejected and every run silently failed to log. SQLite is
+# a fully supported local backend and needs no server.
+MLFLOW_DB_PATH: Path = PROJECT_ROOT / "mlflow.db"
+DEFAULT_MLFLOW_TRACKING_URI: str = f"sqlite:///{MLFLOW_DB_PATH.as_posix()}"
 
 # ============================================================================
 # Health Score Weights
@@ -174,12 +179,15 @@ HEALTH_SCORE_WEIGHTS: Dict[str, float] = {
     "timeliness": 0.15,
 }
 
+# Upper bounds are exclusive (except A, which is capped at 100.0) so that the
+# ranges tile [0, 100] without gaps. Fractional scores such as 89.5 previously
+# matched no range at all and silently fell through to an "F".
 HEALTH_GRADE_RANGES: Dict[str, Tuple[float, float]] = {
     "A": (90.0, 100.0),
-    "B": (75.0, 89.0),
-    "C": (60.0, 74.0),
-    "D": (40.0, 59.0),
-    "F": (0.0, 39.0),
+    "B": (75.0, 90.0),
+    "C": (60.0, 75.0),
+    "D": (40.0, 60.0),
+    "F": (0.0, 40.0),
 }
 
 # ============================================================================

@@ -1,0 +1,384 @@
+/* =============================================================================
+   AuditHub - Polish layer
+   =============================================================================
+   Loaded after style.css. Streamlit's stock widgets are the main thing that
+   makes an app look unfinished; everything below replaces a default that reads
+   as "template". Kept separate from the design tokens so the two concerns stay
+   readable.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Monospace restoration
+   --------------------------------------------------------------------------
+   style.css applies the sans stack broadly, because Streamlit hard-codes its
+   own font onto most elements. That broad rule out-specifies the mono classes,
+   so the figures have to be claimed back explicitly here. */
+
+.ah-stat-value, .ah-contrib-name, .ah-contrib-value, .ah-timeline-stage,
+.ah-grade, code, kbd, pre, samp,
+[data-testid="stMetricValue"], [data-testid="stMetricDelta"],
+[data-testid="stSlider"] [data-testid="stThumbValue"] {
+    font-family: var(--font-mono) !important;
+}
+
+/* Material icons are ligature glyphs: forcing a text font onto them renders
+   the ligature name literally ("dashboard") on top of the label. */
+[data-testid="stIconMaterial"],
+.material-icons, .material-icons-outlined,
+[class*="material-symbols"] {
+    font-family: "Material Symbols Rounded" !important;
+    font-weight: normal !important;
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24 !important;
+    letter-spacing: normal !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Sidebar navigation
+   -------------------------------------------------------------------------- */
+
+/* Streamlit collapses long page lists behind a "View N more" control. Raise the
+   cap so the whole product is visible at once.
+
+   The control itself must stay reachable: Streamlit only renders the remaining
+   pages into the DOM once it is used, so hiding it makes those pages
+   unreachable rather than merely hidden. */
+[data-testid="stSidebarNav"] ul {
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+[data-testid="stSidebarNav"] > div:last-child button {
+    color: var(--accent-hover) !important;
+    font-size: 0.8rem !important;
+    font-weight: 550 !important;
+    padding: 4px 22px !important;
+}
+
+[data-testid="stSidebarNav"] > div:last-child button:hover {
+    color: var(--text) !important;
+}
+
+[data-testid="stSidebarNavSeparator"] { display: none !important; }
+
+[data-testid="stSidebarNav"] li { margin: 0; }
+
+[data-testid="stSidebarNav"] a {
+    position: relative;
+    border-radius: 8px;
+    margin: 1px 10px;
+    padding: 7px 12px !important;
+    transition: background 0.13s ease, color 0.13s ease;
+}
+
+[data-testid="stSidebarNav"] a:hover { background: var(--surface-2); }
+
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+    background: linear-gradient(90deg, var(--accent-soft), transparent 85%);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"] span {
+    color: var(--text) !important;
+    font-weight: 600;
+}
+
+/* Section label above the nav list. */
+[data-testid="stSidebarNav"]::before {
+    content: "Workspace";
+    display: block;
+    padding: 2px 22px 8px 22px;
+    font-size: 0.64rem;
+    font-weight: 650;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Dropdown menus
+   -------------------------------------------------------------------------- */
+
+/* Popovers render in a portal outside .stApp, so they keep the stock light
+   styling unless targeted directly. */
+[data-baseweb="popover"] [role="listbox"],
+[data-baseweb="menu"] {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border-strong) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55) !important;
+    padding: 5px !important;
+}
+
+[data-baseweb="popover"] li,
+[data-baseweb="menu"] li {
+    border-radius: var(--radius-sm) !important;
+    font-size: 0.86rem !important;
+    color: var(--text-secondary) !important;
+    padding: 7px 11px !important;
+}
+
+[data-baseweb="popover"] li:hover,
+[data-baseweb="menu"] li:hover,
+[data-baseweb="popover"] li[aria-selected="true"] {
+    background: var(--accent-soft) !important;
+    color: var(--text) !important;
+}
+
+/* Multiselect chips */
+[data-baseweb="tag"] {
+    background: var(--accent-soft) !important;
+    border: 1px solid var(--accent-border) !important;
+    border-radius: 6px !important;
+    color: #b8bdf0 !important;
+    font-size: 0.78rem !important;
+}
+
+[data-baseweb="tag"] svg { fill: #b8bdf0 !important; }
+
+/* ---------------------------------------------------------------------------
+   Radio rendered as a segmented control
+   -------------------------------------------------------------------------- */
+
+[data-testid="stRadio"] [role="radiogroup"] {
+    gap: 3px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3px;
+    display: inline-flex;
+    /* Streamlit stacks the group vertically by default; a segmented control
+       only reads as one when the options sit side by side. */
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+[data-testid="stRadio"] [role="radiogroup"] label {
+    margin: 0 !important;
+    padding: 5px 14px !important;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.13s ease;
+}
+
+[data-testid="stRadio"] [role="radiogroup"] label:hover { background: var(--surface-2); }
+
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+/* The stock radio dot is redundant inside a segmented control. */
+[data-testid="stRadio"] [role="radiogroup"] label > div:first-child { display: none; }
+
+[data-testid="stRadio"] [role="radiogroup"] label p {
+    font-size: 0.84rem !important;
+    color: var(--text-secondary) !important;
+}
+
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) p {
+    color: var(--text) !important;
+    font-weight: 550;
+}
+
+/* ---------------------------------------------------------------------------
+   Checkbox and slider
+   -------------------------------------------------------------------------- */
+
+[data-testid="stCheckbox"] input + div {
+    border-radius: 5px !important;
+    border-color: var(--border-strong) !important;
+    background: var(--surface-1) !important;
+}
+
+[data-testid="stCheckbox"] label p { font-size: 0.85rem !important; }
+
+[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
+    background: var(--accent) !important;
+    border: 2px solid var(--surface-0) !important;
+    box-shadow: 0 0 0 1px var(--accent-border) !important;
+}
+
+[data-testid="stSlider"] [data-testid="stThumbValue"] {
+    color: var(--text-secondary) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.74rem !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+
+.stButton > button[kind="primary"] {
+    background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.09) inset,
+                0 6px 16px -8px rgba(99, 102, 241, 0.85);
+}
+
+.stButton > button[kind="primary"]:hover {
+    background: linear-gradient(180deg, #8a8cf5, var(--accent-hover));
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.13) inset,
+                0 8px 22px -8px rgba(99, 102, 241, 0.95);
+}
+
+.stButton > button:focus-visible,
+.stDownloadButton > button:focus-visible {
+    outline: 2px solid var(--accent-border);
+    outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Elevation on cards and tiles
+   -------------------------------------------------------------------------- */
+
+.ah-card, .ah-stat, [data-testid="stMetric"] {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 55%),
+        var(--surface-1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.ah-stat {
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+.ah-stat:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+
+/* A hairline along the top edge, so a row of tiles reads as a deliberate group
+   rather than four floating boxes. */
+.ah-stat::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent-border), transparent 70%);
+}
+
+/* ---------------------------------------------------------------------------
+   Alerts
+   -------------------------------------------------------------------------- */
+
+/* Streamlit fills alerts with a 20%-opacity wash of the status colour, which
+   reads as garish on a dark surface. Replace it with a faint tint plus a
+   coloured left edge -- the status stays obvious, the page stays calm.
+   The fill sits on stAlertContainer, not on the stAlert wrapper. */
+[data-testid="stAlertContainer"] {
+    background: var(--surface-1) !important;
+    border: 1px solid var(--border) !important;
+    border-left-width: 3px !important;
+    border-radius: var(--radius) !important;
+    padding: 12px 16px !important;
+}
+
+[data-testid="stAlert"] p { font-size: 0.86rem !important; }
+
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) {
+    border-left-color: var(--ok) !important;
+    background: linear-gradient(90deg, var(--ok-soft), transparent 42%), var(--surface-1) !important;
+}
+
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+    border-left-color: var(--warn) !important;
+    background: linear-gradient(90deg, var(--warn-soft), transparent 42%), var(--surface-1) !important;
+}
+
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) {
+    border-left-color: var(--danger) !important;
+    background: linear-gradient(90deg, var(--danger-soft), transparent 42%), var(--surface-1) !important;
+}
+
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {
+    border-left-color: var(--info) !important;
+    background: linear-gradient(90deg, var(--info-soft), transparent 42%), var(--surface-1) !important;
+}
+
+[data-testid="stAlertContentSuccess"], [data-testid="stAlertContentWarning"],
+[data-testid="stAlertContentError"], [data-testid="stAlertContentInfo"] {
+    color: var(--text-secondary) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Tables, expanders, tabs
+   -------------------------------------------------------------------------- */
+
+[data-testid="stDataFrame"] { background: var(--surface-1); }
+[data-testid="stDataFrame"] > div { border-radius: var(--radius); }
+
+[data-testid="stExpander"] details { border: none; background: transparent; }
+[data-testid="stExpander"] summary:hover { color: var(--text); }
+
+.stTabs [data-baseweb="tab"]:hover { color: var(--text-secondary); }
+.stTabs [data-baseweb="tab-highlight"] { background: var(--accent) !important; }
+.stTabs [data-baseweb="tab-border"] { background: var(--border) !important; }
+
+/* ---------------------------------------------------------------------------
+   Motion
+   -------------------------------------------------------------------------- */
+
+[data-testid="stSpinner"] > div { border-top-color: var(--accent) !important; }
+
+/* Content settles in rather than snapping, which softens Streamlit's habit of
+   re-running the whole script on every interaction. */
+@keyframes ah-fade-in {
+    from { opacity: 0; transform: translateY(3px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.block-container [data-testid="stVerticalBlock"] > div {
+    animation: ah-fade-in 0.22s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Tooltips and links
+   -------------------------------------------------------------------------- */
+
+[data-baseweb="tooltip"] {
+    background: var(--surface-3) !important;
+    border: 1px solid var(--border-strong) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 0.8rem !important;
+    color: var(--text-secondary) !important;
+}
+
+a { color: var(--accent-hover); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Heading anchor links add clutter in a dashboard. */
+h1 a, h2 a, h3 a, h4 a { display: none !important; }
+
+/* ---------------------------------------------------------------------------
+   Stat tile values
+   --------------------------------------------------------------------------
+   The tile was built for short figures. Long text ("permutation_importance",
+   "Classification") overflowed it and broke mid-word, so prose values get a
+   smaller proportional treatment and only ever wrap at word boundaries. */
+
+.ah-stat-value {
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: none;
+}
+
+.ah-stat-value-text {
+    font-family: var(--font-sans) !important;
+    font-size: 1.06rem;
+    font-weight: 600;
+    line-height: 1.32;
+    letter-spacing: -0.005em;
+}
+
+/* A single word longer than the tile cannot wrap at a space, so it steps down
+   again rather than being split mid-word. */
+.ah-stat-value-compact {
+    font-size: 0.92rem;
+    line-height: 1.35;
+}

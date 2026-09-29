@@ -1,93 +1,75 @@
 """
-AuditHub - Streamlit Application Entry Point
-==============================================
+AuditHub - Application Router
+===============================
 
-Main entry point for the AuditHub Streamlit dashboard.
-This is a placeholder — the full dashboard will be implemented
-in a future module.
+Entry point. Defines the navigation and hands off to the selected page.
+
+Streamlit's automatic ``pages/`` navigation truncates a long page list behind a
+"View N more" control and renders bare filenames. Declaring the navigation
+explicitly gives grouped sections, real titles and icons, and keeps every page
+one click away.
 """
+
+import sys
+from pathlib import Path as _Path
+
+_ROOT = _Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 import streamlit as st
 
-from src.utils.constants import APP_DESCRIPTION, APP_NAME, APP_VERSION
-from src.utils.logger import get_logger
+from src.utils.constants import APP_NAME, APP_VERSION
 
-logger = get_logger(__name__)
+st.set_page_config(
+    page_title=f"{APP_NAME} · Data Quality & MLOps",
+    page_icon="◆",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-
-def setup_page() -> None:
-    """Configure the Streamlit page settings."""
-    st.set_page_config(
-        page_title=f"{APP_NAME} - Dataset Quality & MLOps Platform",
-        page_icon="📊",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
+_PAGES = _Path(__file__).resolve().parent / "pages"
 
 
-def render_sidebar() -> None:
-    """Render the application sidebar."""
-    with st.sidebar:
-        st.title(f"📊 {APP_NAME}")
-        st.caption(f"v{APP_VERSION}")
-        st.markdown("---")
-        st.markdown("### Navigation")
-        st.markdown("Coming soon...")
-        st.markdown("---")
-        st.markdown(f"_{APP_DESCRIPTION}_")
+def _page(filename: str, title: str, icon: str, default: bool = False):
+    """Declare a navigation entry for a page file."""
+    return st.Page(_PAGES / filename, title=title, icon=icon, default=default)
 
 
-def render_main() -> None:
-    """Render the main application area."""
-    st.title(f"Welcome to {APP_NAME}")
-    st.markdown(f"*{APP_DESCRIPTION}*")
+# Grouped so the sidebar reads as a workflow rather than an alphabetical dump.
+navigation = st.navigation(
+    {
+        "Overview": [
+            _page("0_Overview.py", "Overview", ":material/dashboard:", default=True),
+        ],
+        "Data": [
+            _page("1_Upload.py", "Upload", ":material/upload_file:"),
+            _page("2_Dataset_Summary.py", "Summary", ":material/table_chart:"),
+            _page("3_Validation.py", "Validation", ":material/verified:"),
+            _page("4_Profiling.py", "Profiling", ":material/analytics:"),
+        ],
+        "Quality": [
+            _page("5_Quality_Audit.py", "Quality Audit", ":material/rule:"),
+            _page("6_Health_Score.py", "Health Score", ":material/monitor_heart:"),
+            _page("7_Repair.py", "Repair", ":material/build:"),
+        ],
+        "Monitoring": [
+            _page("12_Drift.py", "Drift", ":material/ssid_chart:"),
+            _page("13_Version_Compare.py", "Versions & Lineage", ":material/history:"),
+        ],
+        "Modelling": [
+            _page("8_Mutation_Lab.py", "Mutation Lab", ":material/science:"),
+            _page("9_Robustness.py", "Robustness", ":material/shield:"),
+            _page("10_Training.py", "Training", ":material/model_training:"),
+            _page("14_Explainability.py", "Explainability", ":material/psychology:"),
+        ],
+        "Output": [
+            _page("11_Reports.py", "Reports", ":material/description:"),
+        ],
+    },
+    # Without this Streamlit hides everything past the tenth entry behind a
+    # "View 5 more" control, which buries a third of the product.
+    expanded=True,
+)
 
-    st.markdown("---")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(label="Datasets Analyzed", value="0")
-
-    with col2:
-        st.metric(label="Health Score", value="--")
-
-    with col3:
-        st.metric(label="Models Trained", value="0")
-
-    st.markdown("---")
-    st.info(
-        "🚧 The AuditHub dashboard is under active development. "
-        "Modules will be added incrementally. "
-        "Check back soon for updates!"
-    )
-
-    st.markdown("### Coming Modules")
-    modules = [
-        "📤 Dataset Upload & Ingestion",
-        "✅ Dataset Validation (Great Expectations)",
-        "📈 Automated Data Profiling",
-        "🔍 Data Quality Auditing",
-        "❤️ Dataset Health Score",
-        "🔧 Intelligent Data Repair",
-        "🧪 Data Mutation Lab",
-        "💪 Robustness Evaluation",
-        "🤖 ML Training & Experiment Tracking",
-        "📑 Automated Report Generation",
-    ]
-
-    for module in modules:
-        st.markdown(f"- {module}")
-
-
-def main() -> None:
-    """Main application entry point."""
-    setup_page()
-    render_sidebar()
-    render_main()
-
-    logger.info("AuditHub Streamlit app initialized")
-
-
-if __name__ == "__main__":
-    main()
+navigation.run()

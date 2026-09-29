@@ -154,9 +154,6 @@ pip install -r requirements.txt
 
 # 4. Initialize DVC (optional)
 dvc init
-
-# 5. Run Streamlit (coming soon)
-# streamlit run app/main.py
 ```
 
 ### Docker Setup
@@ -169,6 +166,76 @@ docker-compose up --build
 docker build -t audithub .
 docker run -p 8501:8501 audithub
 ```
+
+---
+
+## Usage
+
+AuditHub can be driven three ways. All three share the same engines, so a
+dataset repaired in the UI and one repaired from the CLI come out identical.
+
+### 1. Dashboard
+
+```bash
+streamlit run app/main.py
+```
+
+Upload a dataset on the **Upload** page, then work through Summary →
+Validation → Profiling → Quality Audit → Health Score → **Repair**. Repairs
+apply to the active dataset, so every later page recomputes against the
+repaired data and the health score updates to match.
+
+### 2. Command line (headless)
+
+Runs the whole flow and writes every artifact to disk:
+
+```bash
+python -m src.pipeline run data/raw/customers.csv --target churn
+```
+
+Useful flags: `--numeric-strategy {median,mean,mode}`, `--no-profile`,
+`--no-train`, `--no-robustness`, `--report-format json`, `--max-rows N`,
+`--json` for machine-readable output.
+
+Exit codes: `0` all stages completed, `1` one or more non-critical stages
+failed, `2` the run failed, `3` bad usage. This makes the pipeline safe to use
+as a CI gate.
+
+### 3. REST API
+
+```bash
+uvicorn src.api.main:app --reload
+```
+
+Nine endpoints under `/api/v1/` (`ingest`, `validate`, `profile`, `audit`,
+`health`, `repair`, `mutate`, `robustness`, `train`). `POST /api/v1/repair`
+returns the repaired rows as JSON, or the cleaned file itself with
+`download=true`.
+
+---
+
+## Data Cleaning Guarantees
+
+Files are normalised at load time so that "missing" means the same thing
+throughout the platform:
+
+- Disguised nulls (`?`, `-`, `N/A`, `null`, `missing`, blanks) become real
+  nulls, so completeness metrics are not silently overstated.
+- Numeric text is converted: `$50,000` → `50000`, `(1,200)` → `-1200`,
+  `45%` → `0.45`. Values with leading zeros (zip codes) are left as text.
+- An integer column that pandas floated only because it contains gaps is
+  restored to a nullable integer, so imputing it never yields `32.5`.
+- Column names are trimmed, duplicate labels are made unique, leftover index
+  columns are dropped, and fully empty rows and columns are removed.
+
+Every action is reported in the UI and recorded in the dataset metadata --
+nothing is changed silently.
+
+After **Auto-Repair**, the exported dataset is guaranteed to have no missing
+values, no duplicate rows, no residual missing-value markers, correct column
+types, and no index column. The target column is never imputed: rows with a
+missing label are dropped, because inventing labels fabricates ground truth.
+Re-loading an exported file requires no further repair.
 
 ---
 
@@ -290,14 +357,20 @@ isort src/ tests/
 # Lint
 ruff check src/ tests/
 
+# Run the full pipeline over a dataset
+python -m src.pipeline run data/raw/your.csv --target your_label
+
 # Type check
 mypy src/
 
-# Run Streamlit (coming soon)
-# streamlit run app/main.py
+# Run Streamlit
+streamlit run app/main.py
 
-# Run FastAPI (coming soon)
-# uvicorn src.api.main:app --reload
+# Run FastAPI
+uvicorn src.api.main:app --reload
+
+# Run both at once
+python run_all.py
 ```
 
 ---

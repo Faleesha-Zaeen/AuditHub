@@ -21,6 +21,7 @@ Usage::
     print(summary.potential_targets)
 """
 
+import warnings
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -443,9 +444,14 @@ class DatasetAnalyzer:
             if len(type_set) > 2:  # More than just str + NoneType
                 return ColumnCategory.MIXED
 
-            # Check if it's actually datetime
+            # Check if it's actually datetime. Pandas emits a UserWarning for
+            # every column it has to fall back to dateutil for, which floods
+            # the logs on any text-heavy dataset; the fallback is expected here
+            # because this is a probe, not a parse.
             try:
-                pd.to_datetime(series, errors="raise")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    pd.to_datetime(series, errors="raise")
                 return ColumnCategory.DATETIME
             except (ValueError, TypeError):
                 pass
@@ -951,7 +957,12 @@ def _column_signature(series: pd.Series) -> str:
     """
     import hashlib
     sample = series.dropna().head(1000)
-    sig_str = f"{str(series.dtype)}|{sample.values.tobytes()}"
+    # hash_pandas_object handles every dtype, including pandas extension arrays
+    # such as the nullable Int64 used for integer columns that contain gaps.
+    # The previous `sample.values.tobytes()` raised on those, and for object
+    # columns it hashed memory addresses rather than the values themselves.
+    hashed = pd.util.hash_pandas_object(sample, index=False).values
+    sig_str = f"{str(series.dtype)}|{hashed.tobytes()}"
     return hashlib.md5(sig_str.encode()).hexdigest()
 
 

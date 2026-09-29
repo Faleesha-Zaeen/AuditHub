@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from src.utils.config_manager import ConfigManager
+from src.utils.constants import DEFAULT_MLFLOW_TRACKING_URI
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -126,7 +127,7 @@ class AppSettings:
     log_retention: str = "30 days"
 
     # MLflow
-    mlflow_tracking_uri: str = "mlruns"
+    mlflow_tracking_uri: str = DEFAULT_MLFLOW_TRACKING_URI
     mlflow_experiment: str = "audithub_default"
     mlflow_artifact_location: str = "artifacts/mlflow"
 
@@ -211,7 +212,10 @@ class AppSettings:
             log_rotation=_get(config, "logging", "rotation", default="midnight"),
             log_retention=_get(config, "logging", "retention", default="30 days"),
             # MLflow
-            mlflow_tracking_uri=_get(config, "mlflow", "tracking_uri", default="mlruns"),
+            mlflow_tracking_uri=_get(
+                config, "mlflow", "tracking_uri",
+                default=DEFAULT_MLFLOW_TRACKING_URI,
+            ),
             mlflow_experiment=_get(config, "mlflow", "experiment_name", default="audithub_default"),
             mlflow_artifact_location=_get(config, "mlflow", "artifact_location", default="artifacts/mlflow"),
             # DVC

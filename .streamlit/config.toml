@@ -1,0 +1,24 @@
+# AuditHub - Streamlit theme
+# =============================================================================
+# Sets the base palette for Streamlit's own widgets so they match the design
+# system in app/assets/style.css. Without this, native controls (sliders,
+# selectboxes, tabs) keep their stock colours and clash with the custom CSS.
+
+[theme]
+base = "dark"
+primaryColor = "#6366f1"
+backgroundColor = "#0b0e14"
+secondaryBackgroundColor = "#141821"
+textColor = "#e6e8ee"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
+
+[client]
+# The stock deploy prompt and hamburger add nothing here and read as clutter.
+toolbarMode = "minimal"
+showErrorDetails = true

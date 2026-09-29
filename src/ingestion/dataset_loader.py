@@ -27,6 +27,7 @@ import pandas as pd
 from src.utils.dataset_metadata import DatasetMetadata
 from src.utils.logger import get_logger
 
+from src.ingestion.cleaning import clean_dataframe
 from src.ingestion.exceptions import (
     CorruptedDatasetError,
     EmptyDatasetError,
@@ -39,9 +40,26 @@ from src.ingestion.exceptions import (
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Supported ingestion formats (CSV, Excel, JSON only per spec)
+# Supported ingestion formats
 # ---------------------------------------------------------------------------
-_SUPPORTED_EXTENSIONS = frozenset({".csv", ".xlsx", ".xls", ".json"})
+_SUPPORTED_EXTENSIONS = frozenset({".csv", ".tsv", ".xlsx", ".xls", ".json", ".parquet"})
+
+# Encodings tried in order when UTF-8 decoding fails.
+_ENCODING_FALLBACKS = ("utf-8-sig", "cp1252", "latin1", "iso-8859-1")
+
+# Delimiters considered when sniffing a delimited text file.
+_CANDIDATE_DELIMITERS = (",", ";", "\t", "|")
+
+# Extra missing-value tokens recognised at parse time, on top of the pandas
+# defaults. Kept in sync with src.ingestion.cleaning.MISSING_SENTINELS, which
+# catches the same markers in formats that have no na_values hook (Excel,
+# JSON, Parquet).
+_EXTRA_NA_VALUES = [
+    "-", "--", "---", "?", "??", ".", "n.a.", "n.a", "nil",
+    "missing", "unknown", "undefined", "error", "#error",
+    "not available", "not applicable", "not specified", "not provided",
+    "#value!", "#ref!", "#na", "<null>",
+]
 
 # ---------------------------------------------------------------------------
 # Default read kwargs per format (can be overridden via load())
@@ -49,11 +67,19 @@ _SUPPORTED_EXTENSIONS = frozenset({".csv", ".xlsx", ".xls", ".json"})
 _DEFAULT_CSV_KWARGS: Dict[str, Any] = {
     "encoding": "utf-8",
     "low_memory": False,
+    "na_values": _EXTRA_NA_VALUES,
+    "keep_default_na": True,
+    "skip_blank_lines": True,
 }
 
-_DEFAULT_EXCEL_KWARGS: Dict[str, Any] = {}
+_DEFAULT_EXCEL_KWARGS: Dict[str, Any] = {
+    "na_values": _EXTRA_NA_VALUES,
+    "keep_default_na": True,
+}
 
 _DEFAULT_JSON_KWARGS: Dict[str, Any] = {}
+
+_DEFAULT_PARQUET_KWARGS: Dict[str, Any] = {}
 
 
 # ============================================================================
@@ -81,6 +107,10 @@ class DatasetLoader:
     def load(
         self,
         file_path: Union[str, Path],
+        *,
+        clean: bool = True,
+        sheet_name: Optional[Union[str, int]] = None,
+        max_rows: Optional[int] = None,
         **kwargs: Any,
     ) -> Tuple[pd.DataFrame, DatasetMetadata]:
         """Load a dataset from a file.
@@ -90,7 +120,19 @@ class DatasetLoader:
         Parameters
         ----------
         file_path : str | Path
-            Path to the dataset file (``.csv``, ``.xlsx``, ``.xls``, ``.json``).
+            Path to the dataset file (``.csv``, ``.tsv``, ``.xlsx``, ``.xls``,
+            ``.json``, ``.parquet``).
+        clean : bool
+            Apply structural cleaning after reading -- disguised missing
+            markers become real nulls, headers are trimmed, numeric-looking
+            text becomes numeric, and fully empty rows/columns are dropped.
+            The cleaning record is stored under
+            ``metadata.extra_metadata["cleaning_actions"]``.
+        sheet_name : str | int | None
+            Excel sheet to read. Defaults to the first sheet.
+        max_rows : int | None
+            Read at most this many data rows. Useful for previewing very large
+            files without exhausting memory.
         **kwargs
             Additional keyword arguments passed to the underlying
             ``pd.read_*`` function. Overrides defaults set in constructor.
@@ -125,10 +167,25 @@ class DatasetLoader:
         self._validate_extension(ext)
 
         merged_kwargs = {**self._default_kwargs, **kwargs}
+        if sheet_name is not None:
+            merged_kwargs["sheet_name"] = sheet_name
+        if max_rows is not None:
+            merged_kwargs["nrows"] = max_rows
+
         df = self._read_file(path, ext, merged_kwargs)
+        # Validate the raw read first, so an empty or header-only file still
+        # raises rather than being silently emptied further by cleaning.
         self._validate_dataframe(df, path)
 
-        metadata = self._build_metadata(df, path, ext)
+        cleaning_actions: list = []
+        if clean:
+            df, cleaning_report = clean_dataframe(df)
+            cleaning_actions = cleaning_report.to_dicts()
+            # Cleaning can empty a frame that was only ever sentinel values.
+            self._validate_dataframe(df, path)
+
+        metadata = self._build_metadata(df, path, ext, cleaning_actions=cleaning_actions)
+
         logger.info(
             "Loaded dataset: %s (%d rows, %d columns)",
             path.name, len(df), len(df.columns),
@@ -244,12 +301,14 @@ class DatasetLoader:
             If JSON is invalid.
         """
         try:
-            if ext == ".csv":
-                return self._read_csv(path, kwargs)
+            if ext in {".csv", ".tsv"}:
+                return self._read_csv(path, kwargs, default_sep="\t" if ext == ".tsv" else None)
             elif ext in {".xlsx", ".xls"}:
                 return self._read_excel(path, kwargs)
             elif ext == ".json":
                 return self._read_json(path, kwargs)
+            elif ext == ".parquet":
+                return self._read_parquet(path, kwargs)
             else:
                 # Should not reach here due to _validate_extension
                 raise UnsupportedFormatError(f"Unsupported format: {ext}")
@@ -278,28 +337,126 @@ class DatasetLoader:
             )
 
     @staticmethod
-    def _read_csv(path: Path, kwargs: Dict[str, Any]) -> pd.DataFrame:
-        """Read a CSV file.
+    def _sniff_delimiter(path: Path, encoding: str) -> Optional[str]:
+        """Detect the column delimiter of a delimited text file.
 
-        Tries UTF-8 first, then falls back to common encodings.
+        Reads a small sample and picks the candidate delimiter that yields the
+        most columns while splitting every sampled line consistently. Returns
+        ``None`` when no candidate is convincing, letting pandas decide.
+        """
+        try:
+            with open(path, "r", encoding=encoding, errors="strict") as fh:
+                sample_lines = [line for _, line in zip(range(20), fh) if line.strip()]
+        except (UnicodeDecodeError, OSError):
+            return None
+
+        if not sample_lines:
+            return None
+
+        best_delim: Optional[str] = None
+        best_fields = 1
+        for delim in _CANDIDATE_DELIMITERS:
+            counts = [line.count(delim) for line in sample_lines]
+            if counts[0] == 0:
+                continue
+            # Consistent field count across sampled lines signals a real delimiter.
+            if len(set(counts)) == 1 and counts[0] + 1 > best_fields:
+                best_fields = counts[0] + 1
+                best_delim = delim
+
+        if best_delim and best_delim != ",":
+            logger.info("Sniffed '%s' as the delimiter for %s", repr(best_delim), path.name)
+        return best_delim
+
+    @classmethod
+    def _read_csv(
+        cls,
+        path: Path,
+        kwargs: Dict[str, Any],
+        default_sep: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Read a delimited text file (CSV or TSV).
+
+        Tries UTF-8 first, then falls back to common encodings. When the caller
+        has not pinned a separator, the delimiter is sniffed so that
+        semicolon-, tab- or pipe-delimited exports do not collapse into a
+        single column.
         """
         merged = {**_DEFAULT_CSV_KWARGS, **kwargs}
+        encoding = merged.get("encoding", "utf-8")
+
+        if "sep" not in merged and "delimiter" not in merged:
+            sniffed = cls._sniff_delimiter(path, encoding) or default_sep
+            if sniffed:
+                merged["sep"] = sniffed
+
         try:
             return pd.read_csv(path, **merged)
         except UnicodeDecodeError:
-            # Try common fallback encodings
-            for encoding in ("latin1", "iso-8859-1", "cp1252"):
+            rest = {k: v for k, v in merged.items() if k != "encoding"}
+            for fallback in _ENCODING_FALLBACKS:
                 try:
-                    return pd.read_csv(path, encoding=encoding, **{k: v for k, v in merged.items() if k != "encoding"})
+                    if "sep" not in rest and "delimiter" not in rest:
+                        sniffed = cls._sniff_delimiter(path, fallback) or default_sep
+                        if sniffed:
+                            rest["sep"] = sniffed
+                    df = pd.read_csv(path, encoding=fallback, **rest)
+                    logger.info("Decoded %s using fallback encoding '%s'", path.name, fallback)
+                    return df
                 except UnicodeDecodeError:
                     continue
             raise
 
     @staticmethod
+    def list_sheets(path: Union[str, Path]) -> list:
+        """Return the sheet names of an Excel workbook.
+
+        Lets the UI offer a sheet picker instead of silently reading the first
+        sheet of a multi-sheet workbook.
+        """
+        try:
+            return list(pd.ExcelFile(path).sheet_names)
+        except Exception as exc:  # pragma: no cover - depends on engine
+            logger.warning("Could not list sheets for %s: %s", path, exc)
+            return []
+
+    @staticmethod
     def _read_excel(path: Path, kwargs: Dict[str, Any]) -> pd.DataFrame:
-        """Read an Excel file."""
+        """Read an Excel file, defaulting to the first sheet."""
         merged = {**_DEFAULT_EXCEL_KWARGS, **kwargs}
-        return pd.read_excel(path, **merged)
+        merged.setdefault("sheet_name", 0)
+
+        result = pd.read_excel(path, **merged)
+        # sheet_name=None returns a dict of every sheet; take the first so the
+        # return type stays a DataFrame.
+        if isinstance(result, dict):
+            if not result:
+                raise EmptyDatasetError(
+                    f"Excel workbook contains no sheets: {path}",
+                    details={"filename": path.name},
+                )
+            first_name = next(iter(result))
+            logger.info("Workbook has %d sheets; using '%s'", len(result), first_name)
+            return result[first_name]
+        return result
+
+    @staticmethod
+    def _read_parquet(path: Path, kwargs: Dict[str, Any]) -> pd.DataFrame:
+        """Read a Parquet file.
+
+        ``nrows`` is not supported by the Parquet readers, so it is applied
+        after the fact.
+        """
+        merged = {**_DEFAULT_PARQUET_KWARGS, **kwargs}
+        nrows = merged.pop("nrows", None)
+        # Parquet carries its own schema; text-parsing kwargs do not apply.
+        for unsupported in ("encoding", "low_memory", "na_values", "keep_default_na", "skip_blank_lines", "sep", "sheet_name"):
+            merged.pop(unsupported, None)
+
+        df = pd.read_parquet(path, **merged)
+        if nrows is not None:
+            df = df.head(int(nrows))
+        return df
 
     @staticmethod
     def _read_json(path: Path, kwargs: Dict[str, Any]) -> pd.DataFrame:
@@ -310,6 +467,9 @@ class DatasetLoader:
         import json as json_module
 
         merged = {**_DEFAULT_JSON_KWARGS, **kwargs}
+        # Reader-specific kwargs that pd.read_json does not accept.
+        nrows = merged.pop("nrows", None)
+        merged.pop("sheet_name", None)
 
         # First validate it's parseable JSON
         try:
@@ -345,7 +505,10 @@ class DatasetLoader:
                 details={"filename": path.name},
             )
 
-        return pd.read_json(path, **merged)
+        df = pd.read_json(path, **merged)
+        if nrows is not None:
+            df = df.head(int(nrows))
+        return df
 
     # ------------------------------------------------------------------
     # Metadata building
@@ -356,6 +519,7 @@ class DatasetLoader:
         df: pd.DataFrame,
         path: Path,
         ext: str,
+        cleaning_actions: Optional[list] = None,
     ) -> DatasetMetadata:
         """Build a ``DatasetMetadata`` instance from a loaded DataFrame.
 
@@ -367,6 +531,8 @@ class DatasetLoader:
             Path to the original file.
         ext : str
             File extension.
+        cleaning_actions : list | None
+            Structural cleaning records to attach to ``extra_metadata``.
 
         Returns
         -------
@@ -377,6 +543,15 @@ class DatasetLoader:
         checksum = _compute_sha256(path)
         dtype_map = {col: str(dtype) for col, dtype in df.dtypes.items()}
 
+        extra: Dict[str, Any] = {
+            "file_path": str(path.resolve()),
+            "memory_usage_bytes": int(df.memory_usage(deep=True).sum()),
+            "has_index": df.index.name is not None,
+            "index_name": str(df.index.name) if df.index.name else None,
+        }
+        if cleaning_actions:
+            extra["cleaning_actions"] = cleaning_actions
+
         metadata = DatasetMetadata(
             filename=path.name,
             shape=(len(df), len(df.columns)),
@@ -385,12 +560,7 @@ class DatasetLoader:
             size_bytes=size_bytes,
             checksum=checksum,
             source_format=ext,
-            extra_metadata={
-                "file_path": str(path.resolve()),
-                "memory_usage_bytes": int(df.memory_usage(deep=True).sum()),
-                "has_index": df.index.name is not None,
-                "index_name": str(df.index.name) if df.index.name else None,
-            },
+            extra_metadata=extra,
         )
 
         logger.debug("Built metadata for: %s (checksum: %s...)", path.name, checksum[:12])

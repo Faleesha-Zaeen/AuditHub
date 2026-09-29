@@ -1,0 +1,633 @@
+/* =============================================================================
+   AuditHub - Design System
+   =============================================================================
+   One stylesheet, loaded on every page. Everything is driven by the custom
+   properties below, so the whole product re-skins from a single block.
+
+   The aim is a dense, calm analytics tool: near-black surfaces, one accent
+   colour, semantic status colours used sparingly, and numerals in a monospace
+   face so columns of figures line up and stay scannable.
+   ========================================================================== */
+
+/* Font faces are embedded in fonts.css and injected ahead of this file --
+   Streamlit strips @import from injected CSS, so a webfont referenced that way
+   never loads. */
+
+:root {
+    /* Surfaces: a deliberately shallow ramp. Depth comes from borders, not
+       drop shadows, which keeps a dense dashboard from looking cluttered. */
+    --surface-0: #0b0e14;
+    --surface-1: #11151d;
+    --surface-2: #161b25;
+    --surface-3: #1c222e;
+    --border: #232a37;
+    --border-strong: #2f3846;
+
+    /* Text */
+    --text: #e6e8ee;
+    --text-secondary: #a6adbb;
+    --text-muted: #6b7382;
+
+    /* Single accent. More than one competes with the status colours. */
+    --accent: #6366f1;
+    --accent-hover: #7c7ff2;
+    --accent-soft: rgba(99, 102, 241, 0.12);
+    --accent-border: rgba(99, 102, 241, 0.35);
+
+    /* Semantic status */
+    --ok: #10b981;
+    --ok-soft: rgba(16, 185, 129, 0.12);
+    --warn: #f59e0b;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --danger: #f43f5e;
+    --danger-soft: rgba(244, 63, 94, 0.12);
+    --info: #38bdf8;
+    --info-soft: rgba(56, 189, 248, 0.12);
+
+    /* Type */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* A 4px spacing scale keeps vertical rhythm consistent across pages. */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+
+/* Streamlit hard-codes its own font stack onto most elements, so the override
+   has to be broad and explicit or the embedded faces are ignored. */
+html, body, .stApp, [class*="css"],
+.stApp *:not(code):not(kbd):not(pre):not(.material-icons):not([class*="material-symbols"]) {
+    font-family: var(--font-sans);
+}
+
+html, body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Tabular figures everywhere numbers are compared down a column. */
+[data-testid="stMetricValue"], .ah-stat-value, .ah-contrib-value,
+[data-testid="stTable"] td, [data-testid="stDataFrame"] {
+    font-variant-numeric: tabular-nums;
+}
+
+.stApp {
+    background:
+        radial-gradient(1100px 620px at 78% -12%, rgba(99, 102, 241, 0.07), transparent 60%),
+        var(--surface-0);
+}
+
+/* Streamlit pads the top heavily by default, which wastes the first screenful. */
+.block-container {
+    padding-top: var(--space-6) !important;
+    padding-bottom: var(--space-7) !important;
+    max-width: 1500px;
+}
+
+/* Kill the stock chrome: the running-man, the deploy CTA and the footer are
+   noise in an internal tool. */
+#MainMenu, footer, header [data-testid="stStatusWidget"] { visibility: hidden; }
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stDecoration"] { display: none; }
+
+/* ---------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+
+h1, h2, h3, h4, h5 {
+    font-family: var(--font-sans);
+    color: var(--text);
+    letter-spacing: -0.018em;
+    font-weight: 650;
+}
+
+h1 { font-size: 1.95rem; line-height: 1.2; margin-bottom: var(--space-2); }
+h2 { font-size: 1.35rem; margin-top: var(--space-6); margin-bottom: var(--space-3); }
+h3 { font-size: 1.08rem; margin-top: var(--space-5); margin-bottom: var(--space-2); }
+h4 { font-size: 0.94rem; color: var(--text-secondary); font-weight: 600; }
+
+p, li, label, .stMarkdown { color: var(--text-secondary); line-height: 1.62; }
+
+code, kbd {
+    font-family: var(--font-mono) !important;
+    font-size: 0.86em !important;
+    background: var(--surface-2) !important;
+    color: #b8bdf0 !important;
+    padding: 2px 6px !important;
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid var(--border);
+}
+
+/* ---------------------------------------------------------------------------
+   Page header
+   -------------------------------------------------------------------------- */
+
+.ah-header { margin-bottom: var(--space-6); }
+
+.ah-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: var(--space-2);
+    display: block;
+}
+
+.ah-title {
+    font-size: 1.95rem;
+    font-weight: 680;
+    color: var(--text);
+    letter-spacing: -0.022em;
+    line-height: 1.18;
+    margin: 0 0 var(--space-2) 0;
+}
+
+.ah-subtitle {
+    color: var(--text-muted);
+    font-size: 0.94rem;
+    max-width: 76ch;
+    margin: 0;
+}
+
+.ah-rule {
+    height: 1px;
+    background: linear-gradient(90deg, var(--border-strong), transparent);
+    border: 0;
+    margin: var(--space-5) 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Cards
+   -------------------------------------------------------------------------- */
+
+.ah-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
+}
+
+.ah-card-title {
+    font-size: 0.72rem;
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+}
+
+/* ---------------------------------------------------------------------------
+   Metrics
+   -------------------------------------------------------------------------- */
+
+[data-testid="stMetric"] {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
+    transition: border-color 0.15s ease;
+}
+
+[data-testid="stMetric"]:hover { border-color: var(--border-strong); }
+
+[data-testid="stMetricLabel"] {
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted) !important;
+}
+
+[data-testid="stMetricValue"] {
+    font-family: var(--font-mono) !important;
+    font-size: 1.72rem !important;
+    font-weight: 600 !important;
+    color: var(--text) !important;
+    letter-spacing: -0.02em;
+}
+
+[data-testid="stMetricDelta"] {
+    font-family: var(--font-mono) !important;
+    font-size: 0.8rem !important;
+}
+
+/* Custom stat tile, used where st.metric is too rigid. */
+.ah-stat {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
+    height: 100%;
+}
+
+.ah-stat-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: var(--space-2);
+}
+
+.ah-stat-value {
+    font-family: var(--font-mono);
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.ah-stat-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: var(--space-2);
+}
+
+/* ---------------------------------------------------------------------------
+   Badges
+   -------------------------------------------------------------------------- */
+
+.ah-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    vertical-align: middle;
+}
+
+.ah-badge-ok      { background: var(--ok-soft);     color: var(--ok);     border-color: rgba(16,185,129,0.3); }
+.ah-badge-warn    { background: var(--warn-soft);   color: var(--warn);   border-color: rgba(245,158,11,0.3); }
+.ah-badge-danger  { background: var(--danger-soft); color: var(--danger); border-color: rgba(244,63,94,0.3); }
+.ah-badge-info    { background: var(--info-soft);   color: var(--info);   border-color: rgba(56,189,248,0.3); }
+.ah-badge-neutral { background: var(--surface-3);   color: var(--text-muted); border-color: var(--border-strong); }
+
+/* Grade pill for the health score. */
+.ah-grade {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 62px; height: 62px;
+    border-radius: var(--radius-lg);
+    font-family: var(--font-mono);
+    font-size: 2rem;
+    font-weight: 700;
+    border: 1px solid;
+}
+
+.ah-grade-a { background: var(--ok-soft);     color: var(--ok);     border-color: rgba(16,185,129,0.35); }
+.ah-grade-b { background: var(--info-soft);   color: var(--info);   border-color: rgba(56,189,248,0.35); }
+.ah-grade-c { background: var(--warn-soft);   color: var(--warn);   border-color: rgba(245,158,11,0.35); }
+.ah-grade-d { background: var(--warn-soft);   color: var(--warn);   border-color: rgba(245,158,11,0.35); }
+.ah-grade-f { background: var(--danger-soft); color: var(--danger); border-color: rgba(244,63,94,0.35); }
+
+/* ---------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+
+.stButton > button, .stDownloadButton > button {
+    font-family: var(--font-sans);
+    font-weight: 550;
+    font-size: 0.88rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 0.5rem 1.05rem;
+    transition: background 0.14s ease, border-color 0.14s ease, transform 0.06s ease;
+}
+
+.stButton > button:hover, .stDownloadButton > button:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-border);
+    color: var(--text);
+}
+
+.stButton > button:active, .stDownloadButton > button:active { transform: translateY(1px); }
+
+.stButton > button[kind="primary"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.stButton > button[kind="primary"]:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.stButton > button:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------
+   Inputs
+   -------------------------------------------------------------------------- */
+
+.stSelectbox div[data-baseweb="select"] > div,
+.stMultiSelect div[data-baseweb="select"] > div,
+.stTextInput input,
+.stNumberInput input {
+    background: var(--surface-1) !important;
+    border-color: var(--border) !important;
+    border-radius: var(--radius) !important;
+    color: var(--text) !important;
+    font-size: 0.88rem !important;
+}
+
+.stSelectbox div[data-baseweb="select"] > div:hover,
+.stTextInput input:focus,
+.stNumberInput input:focus {
+    border-color: var(--accent-border) !important;
+}
+
+[data-testid="stWidgetLabel"] p {
+    font-size: 0.8rem !important;
+    font-weight: 550 !important;
+    color: var(--text-secondary) !important;
+}
+
+/* File uploader: the stock dashed box is the single ugliest default. */
+[data-testid="stFileUploaderDropzone"] {
+    background: var(--surface-1);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: var(--accent-border);
+    background: var(--surface-2);
+}
+
+/* ---------------------------------------------------------------------------
+   Tabs
+   -------------------------------------------------------------------------- */
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: var(--space-1);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 40px;
+    padding: 0 var(--space-4);
+    background: transparent;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    font-weight: 550;
+}
+
+.stTabs [aria-selected="true"] {
+    background: var(--surface-1) !important;
+    color: var(--text) !important;
+    border-bottom: 2px solid var(--accent) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Tables & dataframes
+   -------------------------------------------------------------------------- */
+
+[data-testid="stDataFrame"], [data-testid="stTable"] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+[data-testid="stTable"] table { font-size: 0.85rem; }
+
+[data-testid="stTable"] thead th {
+    background: var(--surface-2) !important;
+    color: var(--text-muted) !important;
+    font-size: 0.7rem !important;
+    font-weight: 650 !important;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+[data-testid="stTable"] tbody td {
+    border-bottom: 1px solid var(--border) !important;
+    color: var(--text-secondary) !important;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-testid="stTable"] tbody tr:hover td { background: var(--surface-2) !important; }
+
+/* ---------------------------------------------------------------------------
+   Alerts
+   -------------------------------------------------------------------------- */
+
+[data-testid="stAlert"] {
+    border-radius: var(--radius);
+    border-width: 1px;
+    border-left-width: 3px;
+    font-size: 0.88rem;
+    padding: var(--space-3) var(--space-4);
+}
+
+/* ---------------------------------------------------------------------------
+   Sidebar
+   -------------------------------------------------------------------------- */
+
+[data-testid="stSidebar"] {
+    background: var(--surface-1);
+    border-right: 1px solid var(--border);
+}
+
+[data-testid="stSidebar"] .block-container { padding-top: var(--space-5); }
+
+[data-testid="stSidebarNav"] { padding-top: var(--space-2); }
+
+[data-testid="stSidebarNav"] a {
+    border-radius: var(--radius-sm);
+    margin: 1px var(--space-2);
+    padding: 6px var(--space-3) !important;
+    transition: background 0.12s ease;
+}
+
+[data-testid="stSidebarNav"] a:hover { background: var(--surface-3); }
+
+[data-testid="stSidebarNav"] a span {
+    font-size: 0.86rem !important;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+    background: var(--accent-soft);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"] span {
+    color: var(--text) !important;
+    font-weight: 600;
+}
+
+/* Sidebar brand block */
+.ah-brand {
+    padding: 0 var(--space-3) var(--space-4) var(--space-3);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-3);
+}
+
+.ah-brand-name {
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.ah-brand-mark {
+    width: 22px; height: 22px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    display: inline-block;
+}
+
+.ah-brand-tagline {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+    letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+   Timeline (lineage)
+   -------------------------------------------------------------------------- */
+
+.ah-timeline { border-left: 1px solid var(--border-strong); margin-left: 7px; padding-left: var(--space-4); }
+
+.ah-timeline-item { position: relative; padding: var(--space-2) 0 var(--space-3) 0; }
+
+.ah-timeline-item::before {
+    content: "";
+    position: absolute;
+    left: calc(-1 * var(--space-4) - 4px);
+    top: 14px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--surface-0);
+}
+
+.ah-timeline-text { color: var(--text-secondary); font-size: 0.88rem; }
+
+.ah-timeline-stage {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* Stage flow chips */
+.ah-flow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+.ah-chip {
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 4px 13px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.ah-chip-accent {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
+    color: #b8bdf0;
+}
+
+.ah-flow-arrow { color: var(--text-muted); font-size: 0.8rem; }
+
+/* ---------------------------------------------------------------------------
+   Contribution bars (explainability)
+   -------------------------------------------------------------------------- */
+
+.ah-contrib { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); }
+
+.ah-contrib-name {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    width: 150px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ah-contrib-track { flex: 1; display: flex; align-items: center; height: 20px; position: relative; }
+
+.ah-contrib-axis { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border-strong); }
+
+.ah-contrib-bar { height: 13px; border-radius: 3px; position: absolute; }
+.ah-contrib-pos { background: var(--danger); left: 50%; }
+.ah-contrib-neg { background: var(--ok); right: 50%; }
+
+.ah-contrib-value {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    width: 92px;
+}
+
+/* ---------------------------------------------------------------------------
+   Misc
+   -------------------------------------------------------------------------- */
+
+hr { border-color: var(--border); }
+
+[data-testid="stExpander"] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-1);
+}
+
+[data-testid="stExpander"] summary { font-size: 0.88rem; font-weight: 550; color: var(--text-secondary); }
+
+.stProgress > div > div > div { background: var(--accent); }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: var(--surface-0); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #3d4757; }
+
+/* Plotly charts sit on their own surface rather than floating on the page. */
+[data-testid="stPlotlyChart"] {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-3);
+}

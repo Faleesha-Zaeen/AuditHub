@@ -28,7 +28,8 @@ logging:
   retention: "30 days"
 
 mlflow:
-  tracking_uri: "mlruns"
+  # A bare directory is rejected by MLflow 3.x; sqlite is supported and local.
+  tracking_uri: "sqlite:///mlflow.db"
   experiment_name: "audithub_default"
   artifact_location: "artifacts/mlflow"
 

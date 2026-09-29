@@ -58,6 +58,26 @@ data:
       - 0.10
       - 0.25
 
+  drift:
+    # Population Stability Index thresholds. The 0.1 / 0.25 split is the
+    # long-standing convention in credit risk monitoring: below 0.1 a shift is
+    # not actionable, above 0.25 the population has genuinely moved.
+    psi_warning_threshold: 0.10
+    psi_critical_threshold: 0.25
+    # Significance level for the KS (numeric) and chi-square (categorical) tests.
+    significance_level: 0.05
+    # Quantile bins used to discretise numeric columns before computing PSI.
+    numeric_bins: 10
+    # Categories rarer than this share are pooled before the chi-square test so
+    # that a handful of one-off values cannot dominate the statistic.
+    rare_category_threshold: 0.01
+    # A column needs at least this many non-null rows in both datasets before a
+    # drift verdict is trustworthy.
+    min_samples: 30
+    # Share of comparable columns that must drift for the dataset to be critical.
+    dataset_critical_share: 0.30
+    dataset_warning_share: 0.10
+
 training:
   model_type: "auto"  # Options: auto, linear, tree, ensemble, deep
   test_size: 0.2

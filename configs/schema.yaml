@@ -53,19 +53,22 @@ profiling_schema:
     - "warnings"
 
 health_schema:
+  # Grades are resolved by descending `min` (the highest grade whose `min` the
+  # score reaches wins), so `max` is documentation only and gaps between bands
+  # cannot cause a score to fall through to F.
   grade_ranges:
     A:
       min: 90
       max: 100
     B:
       min: 75
-      max: 89
+      max: 90
     C:
       min: 60
-      max: 74
+      max: 75
     D:
       min: 40
-      max: 59
+      max: 60
     F:
       min: 0
-      max: 39
+      max: 40

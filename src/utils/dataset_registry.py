@@ -58,6 +58,11 @@ class _DatasetRecord(_Base):
     column_names = Column(Text, default="")  # JSON-encoded list
     column_types = Column(Text, default="")  # JSON-encoded dict
     extra_metadata = Column(Text, default="{}")  # JSON-encoded dict
+    # Versioning: datasets sharing a version_group are successive versions of
+    # the same logical dataset, numbered from 1.
+    version = Column(Integer, default=1, index=True)
+    version_group = Column(String(512), default="", index=True)
+    parent_dataset_id = Column(String(36), default="")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
@@ -92,20 +97,89 @@ class DatasetRegistry:
         )
         # Create table if it doesn't exist
         _Base.metadata.create_all(self._engine)
+        self._migrate()
         self._Session = sessionmaker(bind=self._engine)
         logger.debug("DatasetRegistry initialized with db: %s", self._db_path)
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a database was first created.
+
+        ``create_all`` only creates missing *tables*, so a registry written by
+        an earlier version keeps its original columns. Rather than requiring a
+        migration tool for three nullable columns, they are added in place when
+        absent. Existing rows become version 1 of a group named after their
+        filename, which is the correct reading of a pre-versioning registry.
+        """
+        added: List[str] = []
+        with self._engine.begin() as conn:
+            existing = {
+                row[1] for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(dataset_registry)"
+                ).fetchall()
+            }
+            for name, ddl in (
+                ("version", "INTEGER DEFAULT 1"),
+                ("version_group", "VARCHAR(512) DEFAULT ''"),
+                ("parent_dataset_id", "VARCHAR(36) DEFAULT ''"),
+            ):
+                if name not in existing:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE dataset_registry ADD COLUMN {name} {ddl}"
+                    )
+                    added.append(name)
+
+            if added:
+                # Backfill: pre-existing rows are version 1, grouped by filename.
+                conn.exec_driver_sql(
+                    "UPDATE dataset_registry SET version = 1 WHERE version IS NULL"
+                )
+                conn.exec_driver_sql(
+                    "UPDATE dataset_registry SET version_group = filename "
+                    "WHERE version_group IS NULL OR version_group = ''"
+                )
+                logger.info(
+                    "Migrated dataset_registry: added column(s) %s", ", ".join(added)
+                )
 
     # ------------------------------------------------------------------
     # CRUD Operations
     # ------------------------------------------------------------------
 
-    def register(self, metadata: DatasetMetadata) -> str:
+    @staticmethod
+    def default_version_group(filename: str) -> str:
+        """Derive a version group from a filename.
+
+        Successive exports are usually named ``customers_v1.csv``,
+        ``customers_2024_06.csv`` and so on, so the stem is stripped of a
+        trailing version or date suffix to keep them in one group.
+        """
+        import re
+
+        stem = str(filename).rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+        stem = stem.rsplit(".", 1)[0]
+        stem = re.sub(r"[_-](v?\d+(\.\d+)*|\d{4}([_-]?\d{2}){0,2})$", "", stem, flags=re.IGNORECASE)
+        return stem or str(filename)
+
+    def register(
+        self,
+        metadata: DatasetMetadata,
+        version_group: Optional[str] = None,
+        parent_dataset_id: Optional[str] = None,
+    ) -> str:
         """Register a new dataset's metadata.
 
         Parameters
         ----------
         metadata : DatasetMetadata
             Dataset metadata to persist.
+        version_group : str | None
+            Logical dataset this file is a version of. Derived from the
+            filename when omitted. The version number is assigned
+            automatically as one past the highest existing version in the
+            group, so repeated uploads of the same logical dataset become
+            V1, V2, V3 without the caller tracking anything.
+        parent_dataset_id : str | None
+            Explicit predecessor. Defaults to the latest version in the group.
 
         Returns
         -------
@@ -121,6 +195,16 @@ class DatasetRegistry:
 
         session = self._Session()
         try:
+            group = version_group or self.default_version_group(metadata.filename)
+            previous = (
+                session.query(_DatasetRecord)
+                .filter(_DatasetRecord.version_group == group)
+                .order_by(_DatasetRecord.version.desc())
+                .first()
+            )
+            next_version = (previous.version or 0) + 1 if previous else 1
+            parent = parent_dataset_id or (previous.dataset_id if previous else "")
+
             record = _DatasetRecord(
                 dataset_id=metadata.dataset_id,
                 filename=metadata.filename,
@@ -134,10 +218,16 @@ class DatasetRegistry:
                 column_names=json.dumps(metadata.column_names),
                 column_types=json.dumps(metadata.column_types),
                 extra_metadata=json.dumps(metadata.extra_metadata),
+                version=next_version,
+                version_group=group,
+                parent_dataset_id=parent,
             )
             session.add(record)
             session.commit()
-            logger.info("Registered dataset: %s (%s)", metadata.filename, metadata.dataset_id)
+            logger.info(
+                "Registered dataset: %s (%s) as %s v%d",
+                metadata.filename, metadata.dataset_id, group, next_version,
+            )
             return metadata.dataset_id
         except Exception as exc:
             session.rollback()
@@ -173,21 +263,112 @@ class DatasetRegistry:
             )
             if record is None:
                 return None
+            return self._to_metadata(record)
+        finally:
+            session.close()
 
-            return DatasetMetadata(
-                dataset_id=record.dataset_id,
-                filename=record.filename,
-                shape=(record.num_rows or 0, record.num_columns or 0),
-                size_bytes=record.size_bytes or 0,
-                checksum=record.checksum or "",
-                source_format=record.source_format or "",
-                description=record.description,
-                tags=tuple(t.strip() for t in record.tags.split(",") if t.strip()) if record.tags else (),
-                column_names=json.loads(record.column_names) if record.column_names else [],
-                column_types=json.loads(record.column_types) if record.column_types else {},
-                extra_metadata=json.loads(record.extra_metadata) if record.extra_metadata else {},
-                upload_timestamp=record.created_at.isoformat() if record.created_at else "",
+    def _to_metadata(self, record: "_DatasetRecord") -> DatasetMetadata:
+        """Convert an ORM row into a :class:`DatasetMetadata`."""
+        import json
+
+        extra = json.loads(record.extra_metadata) if record.extra_metadata else {}
+        # Surface the versioning fields without changing the frozen dataclass.
+        extra.setdefault("version", record.version or 1)
+        extra.setdefault("version_group", record.version_group or "")
+        extra.setdefault("parent_dataset_id", record.parent_dataset_id or "")
+
+        return DatasetMetadata(
+            dataset_id=record.dataset_id,
+            filename=record.filename,
+            shape=(record.num_rows or 0, record.num_columns or 0),
+            size_bytes=record.size_bytes or 0,
+            checksum=record.checksum or "",
+            source_format=record.source_format or "",
+            description=record.description,
+            tags=tuple(t.strip() for t in record.tags.split(",") if t.strip()) if record.tags else (),
+            column_names=json.loads(record.column_names) if record.column_names else [],
+            column_types=json.loads(record.column_types) if record.column_types else {},
+            extra_metadata=extra,
+            upload_timestamp=record.created_at.isoformat() if record.created_at else "",
+        )
+
+    # ------------------------------------------------------------------
+    # Versioning
+    # ------------------------------------------------------------------
+
+    def list_version_groups(self) -> List[Dict[str, Any]]:
+        """List every logical dataset that has at least one registered version.
+
+        Returns
+        -------
+        list[dict]
+            One entry per group with its name, version count and latest version.
+        """
+        session = self._Session()
+        try:
+            records = (
+                session.query(_DatasetRecord)
+                .order_by(_DatasetRecord.version_group, _DatasetRecord.version)
+                .all()
             )
+            groups: Dict[str, Dict[str, Any]] = {}
+            for record in records:
+                group = record.version_group or record.filename
+                entry = groups.setdefault(
+                    group, {"version_group": group, "versions": 0, "latest_version": 0,
+                            "latest_dataset_id": "", "filenames": []}
+                )
+                entry["versions"] += 1
+                if (record.version or 1) >= entry["latest_version"]:
+                    entry["latest_version"] = record.version or 1
+                    entry["latest_dataset_id"] = record.dataset_id
+                if record.filename not in entry["filenames"]:
+                    entry["filenames"].append(record.filename)
+            return sorted(groups.values(), key=lambda g: g["version_group"])
+        finally:
+            session.close()
+
+    def list_versions(self, version_group: str) -> List[DatasetMetadata]:
+        """Return every registered version of a logical dataset, oldest first."""
+        session = self._Session()
+        try:
+            records = (
+                session.query(_DatasetRecord)
+                .filter(_DatasetRecord.version_group == version_group)
+                .order_by(_DatasetRecord.version)
+                .all()
+            )
+            return [self._to_metadata(r) for r in records]
+        finally:
+            session.close()
+
+    def get_version(self, version_group: str, version: int) -> Optional[DatasetMetadata]:
+        """Return a specific version of a logical dataset, if registered."""
+        session = self._Session()
+        try:
+            record = (
+                session.query(_DatasetRecord)
+                .filter(
+                    _DatasetRecord.version_group == version_group,
+                    _DatasetRecord.version == version,
+                )
+                .first()
+            )
+            return self._to_metadata(record) if record else None
+        finally:
+            session.close()
+
+    def latest_version(self, version_group: str) -> Optional[DatasetMetadata]:
+        """Return the most recent version of a logical dataset."""
+        session = self._Session()
+        try:
+            record = (
+                session.query(_DatasetRecord)
+                .filter(_DatasetRecord.version_group == version_group)
+                .order_by(_DatasetRecord.version.desc())
+                .first()
+            )
+            return self._to_metadata(record) if record else None
         finally:
             session.close()
 
@@ -215,20 +396,7 @@ class DatasetRegistry:
             )
             results = []
             for record in records:
-                results.append(DatasetMetadata(
-                    dataset_id=record.dataset_id,
-                    filename=record.filename,
-                    shape=(record.num_rows or 0, record.num_columns or 0),
-                    size_bytes=record.size_bytes or 0,
-                    checksum=record.checksum or "",
-                    source_format=record.source_format or "",
-                    description=record.description,
-                    tags=tuple(t.strip() for t in record.tags.split(",") if t.strip()) if record.tags else (),
-                    column_names=json.loads(record.column_names) if record.column_names else [],
-                    column_types=json.loads(record.column_types) if record.column_types else {},
-                    extra_metadata=json.loads(record.extra_metadata) if record.extra_metadata else {},
-                    upload_timestamp=record.created_at.isoformat() if record.created_at else "",
-                ))
+                results.append(self._to_metadata(record))
             return results
         finally:
             session.close()
@@ -252,20 +420,7 @@ class DatasetRegistry:
             )
             results = []
             for record in records:
-                results.append(DatasetMetadata(
-                    dataset_id=record.dataset_id,
-                    filename=record.filename,
-                    shape=(record.num_rows or 0, record.num_columns or 0),
-                    size_bytes=record.size_bytes or 0,
-                    checksum=record.checksum or "",
-                    source_format=record.source_format or "",
-                    description=record.description,
-                    tags=tuple(t.strip() for t in record.tags.split(",") if t.strip()) if record.tags else (),
-                    column_names=json.loads(record.column_names) if record.column_names else [],
-                    column_types=json.loads(record.column_types) if record.column_types else {},
-                    extra_metadata=json.loads(record.extra_metadata) if record.extra_metadata else {},
-                    upload_timestamp=record.created_at.isoformat() if record.created_at else "",
-                ))
+                results.append(self._to_metadata(record))
             return results
         finally:
             session.close()
