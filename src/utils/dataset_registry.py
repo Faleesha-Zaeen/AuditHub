@@ -21,12 +21,14 @@ Usage::
 """
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.orm import Session as SASession
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+from src.utils.constants import DATABASE_PATH
 from src.utils.dataset_metadata import DatasetMetadata
 from src.utils.exceptions import DatabaseException
 from src.utils.logger import get_logger
@@ -90,7 +92,13 @@ class DatasetRegistry:
     """
 
     def __init__(self, db_path: Optional[str] = None) -> None:
-        self._db_path = db_path or "data/audithub.db"
+        # Anchored to the project root (not the process CWD) and its parent
+        # directory created first, so the registry also works when launched
+        # from another working directory or on a fresh deployment where
+        # data/ is not under version control.
+        default_path = DATABASE_PATH
+        default_path.parent.mkdir(parents=True, exist_ok=True)
+        self._db_path = str(Path(db_path or default_path))
         self._engine = create_engine(
             f"sqlite:///{self._db_path}",
             connect_args={"check_same_thread": False},

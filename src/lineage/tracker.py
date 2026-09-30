@@ -25,11 +25,13 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+from src.utils.constants import DATABASE_PATH
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -184,7 +186,10 @@ class LineageTracker:
         dataset_id: str = "",
         dataset_name: str = "",
     ) -> None:
-        self._db_path = db_path or "data/audithub.db"
+        self._db_path = db_path or str(DATABASE_PATH)
+        # data/ is not under version control, so create it before SQLite
+        # tries to open the file on a fresh deployment.
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         self._engine = create_engine(
             f"sqlite:///{self._db_path}",
             connect_args={"check_same_thread": False},
