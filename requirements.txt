@@ -17,7 +17,7 @@ python-multipart==0.0.20
 
 # === Data Processing ===
 pandas==2.3.3
-numpy==2.2.6
+numpy==1.26.4  # <2.0 required by great-expectations 0.18.19; 2.x has no wheels for the pinned stack
 scikit-learn==1.7.1
 scipy==1.16.1
 
